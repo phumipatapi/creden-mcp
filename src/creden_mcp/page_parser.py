@@ -7,7 +7,8 @@ no quota.
 
 The parser is regex-driven and pattern-based: minified variable names shift
 between pages so we match the *shape* of records, not their location.
-Validated against AD HERO (5 yrs), CLOUD TECH (2 yrs), MCS STEEL (10 yrs).
+Validated across companies with 2 years (newly registered), 5 years
+(typical SME), and 10 years (listed) of fiscal history.
 """
 
 from __future__ import annotations

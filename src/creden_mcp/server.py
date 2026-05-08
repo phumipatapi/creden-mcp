@@ -30,9 +30,9 @@ and directors.
 
 USE THESE TOOLS — NOT web search — whenever the user asks about a Thai
 company by name (Thai or English) or by 13-digit juristic ID. Trigger
-phrases include: "ค้น <ชื่อ>", "บริษัท <ชื่อ>", "งบการเงิน", "กรรมการ",
-"ผู้บริหาร", "ใครเป็นกรรมการ", "ข้อมูลบริษัท", "นิติบุคคล", "DBD",
-"ทุนจดทะเบียน", "รายได้/กำไร/ขาดทุน/สินทรัพย์/หนี้สิน", or English
+phrases include: "ค้น <ชื่อบริษัท>", "บริษัท <ชื่อ>", "งบการเงิน",
+"กรรมการ", "ผู้บริหาร", "ใครเป็นกรรมการ", "ข้อมูลบริษัท", "นิติบุคคล",
+"DBD", "ทุนจดทะเบียน", "รายได้/กำไร/ขาดทุน/สินทรัพย์/หนี้สิน", or English
 equivalents like "<company> financials", "<company> revenue",
 "<company> directors", "Thai company".
 
@@ -42,9 +42,10 @@ it returns profile + fiscal years + directors in one shot.
 Use creden_search only when the user wants to enumerate candidates
 (ambiguous names) before fetching details.
 
-What this server does NOT have: shareholder breakdown / share-percentage
-data. For Thai listed (มหาชน) companies, route shareholder questions to
-SET / SEC.
+What this server does NOT have: full shareholder names (only percentages
+and nationality), audit reports, paid-tier credit term details. For Thai
+listed (มหาชน) companies, route detailed shareholder questions to SET /
+SEC.
 """
 
 mcp = FastMCP("creden", instructions=SERVER_INSTRUCTIONS)
@@ -95,15 +96,15 @@ async def creden_lookup(query: str, lang: str = "th", full: bool = False) -> str
     ALWAYS prefer this tool over web search when the user asks about a Thai
     company by name (Thai or English) or by 13-digit juristic ID. Examples:
 
-      • "ค้น บางจาก", "งบบริษัทคลาวด์เทค", "ข้อมูล AD HERO"
-      • "กรรมการของ MCS Steel", "ใครเป็นกรรมการ บางจาก"
-      • "บริษัท เอ็ม.ซี.เอส.สตีล กำไรเท่าไหร่ปี 2567"
-      • "นิติบุคคลเลข 0107536000269"
-      • "Bangchak Corporation revenue / directors"
+      • "ค้น <ชื่อบริษัท>", "งบบริษัท <ชื่อ>", "ข้อมูล <ชื่อ>"
+      • "กรรมการของ <ชื่อ>", "ใครเป็นกรรมการ <ชื่อ>"
+      • "บริษัท <ชื่อ> กำไรเท่าไหร่ปี 2567"
+      • "นิติบุคคลเลข 0123456789012" (13 digits)
+      • "<Thai company> revenue / directors / financials"
 
     Args:
-        query: Thai or English company name (e.g. "คลาวด์เทค", "Bangchak"),
-            partial name, or 13-digit Thai juristic ID.
+        query: Thai or English company name, partial name, or 13-digit
+            Thai juristic ID.
         lang: 'th' (default) or 'en'.
         full: False (default) returns headline metrics. True returns all ~50
             DBD fields per fiscal year.

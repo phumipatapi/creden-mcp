@@ -4,8 +4,8 @@ from creden_mcp.client import _wildcard_q
 
 
 def test_wildcard_q_thai():
-    # ปตท → ป *ต *ท
-    assert _wildcard_q("ปตท") == "ป *ต *ท"
+    # 'ทดสอบ' → 'ท *ด *ส *อ *บ'
+    assert _wildcard_q("ทดสอบ") == "ท *ด *ส *อ *บ"
 
 
 def test_wildcard_q_single_char():

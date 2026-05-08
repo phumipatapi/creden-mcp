@@ -1,49 +1,64 @@
-# Creden MCP Server
+# creden-mcp
 
-MCP server ให้ AI agent (Claude Desktop / Claude Code) ค้นหาข้อมูลบริษัทจาก [data.creden.co](https://data.creden.co) โดยใช้ชื่อภาษาไทย — ไม่ต้อง login, ไม่กิน API quota
-
-## ทำอะไรได้
+MCP server ที่ให้ AI agent (Claude Code / Claude Desktop) ดึงข้อมูลบริษัทไทยจาก [data.creden.co](https://data.creden.co) ได้ — ค้นด้วยชื่อภาษาไทย/อังกฤษ หรือเลขนิติบุคคล แล้วได้ profile, งบการเงิน 5–10 ปี, กรรมการ, % ผู้ถือหุ้น, ผู้มีอำนาจลงนาม ในการเรียกเดียว
 
 ```
-"คลาวด์เทค"  →  บริษัท คลาวด์เทค จำกัด (id=0105566076008)
-              ทุน 1,000,000 บาท · จดทะเบียน 10 เม.ย. 2566 · ICT
-              งบ 2 ปี: 2566 รายได้ 2.2M ขาดทุน 41K
-                     2567 รายได้ 6.0M กำไร 342K (+169% YoY)
+"<ชื่อบริษัท>"
+   ↓ creden_lookup
+   ↓
+บริษัท ABC จำกัด (id=0123456789012)
+จดทะเบียน <date> · ทุน <amount> บาท · <industry>
+
+ปี (พ.ศ.)    รายได้รวม    กำไรสุทธิ    สินทรัพย์รวม    YoY%
+<year>          ...           ...           ...          ...
+<year>          ...           ...           ...          ...
+
+กรรมการ:               <list>
+ผู้มีอำนาจลงนาม:        <list>
+ผู้ถือหุ้น:              <pct1>% / <pct2>% (ไทย 100%)
+ราคาต่อหุ้น:            <shares> หุ้น × ...
 ```
 
-ทำงานด้วย 2 step ที่เป็น **public** ทั้งคู่ (ไม่ต้อง credentials):
+## ทำไมใช้ตัวนี้
 
-1. `POST /sapi/search/get_suggestion` — ชื่อ → company_id
-2. `GET /company/general/<id>` — HTML ที่ Nuxt hydrate ข้อมูลทั้งหมดมาแล้ว → parse
+- **ไม่ต้อง login** สำหรับข้อมูลส่วนใหญ่ — profile + งบการเงิน 5–10 ปี ใช้ public HTML route
+- **กรรมการ / ผู้ถือหุ้น %** อยู่หลัง free-tier login (ใส่ credentials ใน `.env`)
+- **Auto re-login** ถ้า session หมด ระบบ detect 401 → login ใหม่ → retry อัตโนมัติ
+- **Single tool** — call เดียวได้ทุกอย่าง agent ไม่ต้องตัดสินใจระหว่างหลาย tool
+- ทำงานกับ **Claude Code, Claude Desktop**, หรือ MCP client อื่นๆ ที่ speak stdio
 
-ข้อมูลที่ได้ต่อบริษัท:
-- ชื่อ TH/EN, juristic id, จดทะเบียน, ทุน, อุตสาหกรรม, ที่อยู่, วัตถุประสงค์
-- งบการเงิน 2-10 ปี (ขึ้นกับว่าบริษัทยื่นไว้กี่ปี): รายได้รวม, กำไร/ขาดทุน, สินทรัพย์, หนี้สิน, ส่วนผู้ถือหุ้น, NET_PROFIT_MARGIN, YoY %
-- chart data (สำหรับ visualization)
-
-## Setup (Claude Code)
+## Install
 
 ```bash
-# 1. Install
+git clone https://github.com/<your-username>/creden-mcp.git
+cd creden-mcp
 python3 -m venv .venv
 .venv/bin/pip install -e .
-
-# 2. Register with Claude Code (user scope = available in all projects)
-claude mcp add creden --scope user $(pwd)/.venv/bin/creden-mcp
-
-# 3. Verify
-claude mcp list | grep creden        # → ✓ Connected
 ```
 
-จากนั้นใน Claude Code ใหม่ พิมพ์ขอข้อมูลได้เลย เช่น:
-- "งบการเงิน 5 ปีย้อนหลังของบริษัท แอด ฮีโร่"
-- "ค้นบริษัทชื่อ คลาวด์เทค"
-- "ดู MCS Steel"
+ต้องการ Python ≥ 3.11
 
-ถ้าจะใช้กับ **Claude Desktop** แทน:
+## Setup กับ Claude Code
+
+```bash
+claude mcp add creden --scope user $(pwd)/.venv/bin/creden-mcp
+claude mcp list | grep creden       # → ✓ Connected
+```
+
+ใน session ใหม่ของ Claude Code ถามได้เลย:
+
+```
+"งบการเงิน 5 ปีของ <ชื่อบริษัท>"
+"ใครเป็นกรรมการบริษัท <ชื่อ>"
+"ค้นบริษัท <ชื่อ>"
+"นิติบุคคลเลข <id 13 หลัก> ทำธุรกิจอะไร"
+```
+
+### Setup กับ Claude Desktop
+
+`~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
-// ~/Library/Application Support/Claude/claude_desktop_config.json
 {
   "mcpServers": {
     "creden": {
@@ -53,61 +68,117 @@ claude mcp list | grep creden        # → ✓ Connected
 }
 ```
 
-## ถอนการติดตั้ง
+### Credentials (optional แต่แนะนำ)
 
 ```bash
-claude mcp remove creden
+cp .env.example .env
+# แก้ไข .env ใส่ CREDEN_EMAIL / CREDEN_PASSWORD
 ```
 
-## Note
+ไม่ใส่ก็ใช้ได้ — แค่ field ที่ gate (กรรมการ/ผู้ถือหุ้น/ผู้ลงนาม) จะเป็น `null` พร้อม `auth_data_status` บอกเหตุผล
 
-ไม่ต้อง config อะไร — `.env` มีไว้เผื่อใช้ authenticated endpoints (filter search) เท่านั้น, ไม่จำเป็น
+ใส่แล้ว register แบบ inline ก็ได้ (ไม่ต้องมี `.env` ในโปรเจกต์):
 
-## MCP Tools
+```bash
+claude mcp add creden --scope user \
+  --env CREDEN_EMAIL=you@example.com \
+  --env CREDEN_PASSWORD=secret \
+  /path/to/.venv/bin/creden-mcp
+```
+
+## Tools
 
 | Tool | Purpose |
 |---|---|
-| `creden_lookup(query)` | **Main tool**: รับชื่อหรือ id 13 หลัก → profile + งบ + กรรมการ ครบ |
-| `creden_search(text)` | คืน list ของ candidates (ใช้เมื่อชื่อซ้ำกัน) |
+| `creden_lookup(query)` | **Main**: ชื่อ หรือ id 13 หลัก → ข้อมูลครบในการเรียกเดียว |
+| `creden_search(text)` | คืน list candidates สำหรับชื่อที่ ambiguous |
 
-`creden_lookup` รวมทุกอย่างใน call เดียว:
-- **Profile** (no auth) — ชื่อ, juristic id, จดทะเบียน, ทุน, อุตสาหกรรม, ที่อยู่
-- **Fiscal years** (no auth) — รายได้, กำไร, สินทรัพย์, หนี้สิน, equity, NPM, YoY%
-- **Directors** (auth) — กรรมการ/ผู้มีอำนาจลงนาม. ต้องตั้ง `CREDEN_EMAIL`/
-  `CREDEN_PASSWORD` ใน `.env`. ผลถูก cache 30 วันต่อบริษัท → กิน point ครั้งแรก
-  เท่านั้น. ถ้าไม่ตั้ง credentials, lookup ยังทำงานได้ปกติ — `directors` จะเป็น
-  `null` พร้อม `directors_status` บอกเหตุผล.
+ผลที่ได้จาก `creden_lookup` (โครงสร้างตัวอย่าง):
 
-`creden_lookup(query, full=True)` คืน DBD codes ทุก field (~50 fields/ปี).
-
-## Tests
-
-```bash
-pytest
+```jsonc
+{
+  "company": {
+    "th": "บริษัท ... จำกัด",
+    "en": "... CO., LTD.",
+    "juristic_id": "0123456789012",
+    "register_date_th": "...",
+    "register_capital": 1000000,
+    "industry_th": "<TSIC code> : <description>",
+    "address_th": "...",
+    "objective": "..."
+  },
+  "fiscal_years": [
+    { "FISCAL_YEAR": 2566, "BAL_IN09": 0, "BAL_IN21": 0, "BAL_BS22_BAL_BS99": 0 },
+    { "FISCAL_YEAR": 2567, "BAL_IN09": 0, "BAL_IN21": 0, "BAL_BS22_BAL_BS99": 0 }
+  ],
+  "directors": [{ "name_search": "...", "name_search_en": "...", "index": 1 }],
+  "director_history": [/* เข้า/ออก กรรมการ พร้อมวันที่ */],
+  "shareholders_summary": {
+    "percentages": [50.0, 50.0],
+    "names_masked": ["A", "B"],
+    "by_nationality": [{ "nationality": "TH", "pct": 100 }]
+  },
+  "authorized_signers": ["..."],
+  "signing_rule": "...",
+  "share_info": { "total_shares": 0, "price_per_share": 0 },
+  "auth_data_status": "fetched"
+}
 ```
 
-Tests รัน parser กับ HTML ของบริษัทจริง 3 รูปแบบ (5 ปี / 2 ปี / 10 ปี + มหาชน)
+`creden_lookup(query, full=True)` คืน DBD codes ทุก field (~50 fields/ปี)
 
 ## Architecture
 
 ```
 src/creden_mcp/
-  page_parser.py   # Nuxt HTML → dict (regex-driven, var-name agnostic)
-  client.py        # async httpx — public flow + optional auth flow
-  server.py        # FastMCP — 2 tools wrapping client.lookup
-  config.py        # env loading (.env optional)
-  discovery.py     # Playwright capture (สำหรับหา endpoint ใหม่)
-  models.py        # Pydantic shapes (loose)
+  config.py        env / .env loading (pure dataclass)
+  page_parser.py   parse window.__NUXT__ → dict (regex-based, var-name agnostic)
+  client.py        async httpx client; auto re-login on session expiry
+  server.py        FastMCP — 2 tools wrapping client.lookup
+  models.py        loose Pydantic shapes
+  discovery.py     Playwright XHR capture (สำหรับหา endpoint ใหม่)
 ```
 
-## Authenticated path (optional)
+**Public flow** (no auth):
+```
+suggest /sapi/search/get_suggestion           →  company_id
+GET     /company/general/<id>                 →  HTML with full Nuxt-hydrated state
+                                                 → parse profile + fiscal years
+```
 
-มี `client.search_full()` + `client.login()` สำหรับ filter search (ทุนจดทะเบียน, จังหวัด, ฯลฯ) — ต้องการ `CREDEN_EMAIL` + `CREDEN_PASSWORD` ใน `.env`. ไม่จำเป็นถ้าใช้แค่ lookup ตามชื่อ
+**Auth flow** (`.env` credentials):
+```
+POST /sapi/authen/login                       →  cookie session
+POST /sapi/company/get_detail_minor_general   →  director history,
+                                                 shareholders %, signers, shares
+POST /sapi/company/get_detail_sub_general     →  current directors
+```
 
-## ที่ยังไม่ได้ทำ
+Session expiry → ถ้า 401 หรือ body มี `"session expired"` → auto re-login → retry ครั้งเดียว
 
-- รายชื่อผู้ถือหุ้นเต็ม (parsed page มีแค่ summary)
-- network/affiliates graph
-- credit term details
+## Limitations
 
-discovery script (`python -m creden_mcp.discovery <id>`) ใช้ Playwright capture XHR ถ้าต้องการหา endpoint เพิ่ม
+ไม่มี (และไม่สามารถดึงได้ด้วย free Creden tier):
+- **ชื่อผู้ถือหุ้นเต็ม** — masked เป็น "A", "B", … เห็นแค่ % และสัญชาติ
+- **ผู้สอบบัญชี (ชื่อจริง)** — masked
+- **Email/phone บริษัท** — masked
+- **fs_score / credit term / value per share precise** — masked, paid tier
+- **บริษัทมหาชน + ข้อมูล realtime** — สำหรับ listed companies (มหาชน) ใช้ SET/SEC สำหรับข้อมูลผู้ถือหุ้นเต็มและงบไตรมาสล่าสุด
+
+## Tests
+
+```bash
+pip install -e ".[dev]"
+pytest
+```
+
+## Disclaimer
+
+- โครงการนี้เรียก data.creden.co API + scrape Nuxt-hydrated HTML. ผู้ใช้ต้องรับผิดชอบในการปฏิบัติตาม [Terms of Service ของ Creden](https://data.creden.co)
+- Credentials ของคุณส่งตรงไปที่ Creden — โครงการนี้ไม่ proxy ผ่าน server กลาง
+- Default request delay = 1.5 วินาที (ปรับใน `.env` ได้) — ปรับลงด้วยความระมัดระวังเพื่อไม่กระทบ Creden quota
+- เครื่องมือนี้ใช้สำหรับการเข้าถึงข้อมูลที่ผู้ใช้มีสิทธิ์เข้าถึงอยู่แล้วผ่าน Creden อย่าใช้เพื่อรวบรวมข้อมูลส่วนบุคคลของบุคคลที่สามโดยไม่ได้รับอนุญาต
+
+## License
+
+[MIT](LICENSE) © 2026 phpgng
