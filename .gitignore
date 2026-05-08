@@ -1,0 +1,32 @@
+# Secrets
+.env
+.env.local
+.creden_session.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+build/
+dist/
+
+# Virtualenvs
+.venv/
+venv/
+env/
+
+# Test/build caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IDEs / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Discovery / scratch
+discovery_output/
+playwright-report/
+*.local.html
